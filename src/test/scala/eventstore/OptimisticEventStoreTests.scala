@@ -1,0 +1,5 @@
+package eventstore
+
+class OptimisticEventStoreTests {
+
+}
