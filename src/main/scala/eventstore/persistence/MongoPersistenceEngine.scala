@@ -45,7 +45,10 @@ class MongoPersistenceEngine(store: MongoDB, serializer: IDocumentSerializer)
         });
     }
 
-  //       
+  def transactionCount = {
+    this.persistedCommits.size
+  }       
+  
   // Members declared in eventstore.ICommitEvents   
   def commit(attempt: eventstore.Commit): Unit = {
     log.debug("AttemptingToCommit", (attempt.events.size, attempt.streamId, attempt.commitSequence))

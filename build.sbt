@@ -18,7 +18,8 @@ libraryDependencies ++= Seq(
 "org.scalatest" % "scalatest_2.10" % "1.9.1" % "test",
 //"junit" % "junit" % "4.11" % "test",
 "com.novocode" % "junit-interface" % "0.10" % "test",
-"ch.qos.logback" % "logback-classic" % "1.0.7"
+"ch.qos.logback" % "logback-classic" % "1.0.7",
+"com.typesafe.akka" %% "akka-actor" % "2.3.2"
 )
 
 // retrieveManaged := true

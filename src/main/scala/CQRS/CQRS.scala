@@ -38,14 +38,14 @@ class EventStoreRepository(val store: eventstore.IStoreEvents, val bus: IEventPu
     }
   }
 
-  private def getAggregate[T <: AggregateRoot: ClassTag](atype: Class[_], snapshot: Option[eventstore.Snapshot], stream: eventstore.IEventStream): T = {
-    log.debug("Trying to create a {}", atype.getName())
+  private def getAggregate[T <: AggregateRoot: ClassTag](tmpl: T, snapshot: Option[eventstore.Snapshot], stream: eventstore.IEventStream): T = {
+    log.debug("Trying to create a {}", tmpl.getClass().getName())
     val aggregate = snapshot match {
       case None => {
-        atype.newInstance().asInstanceOf[T]
+        tmpl
       }
       case Some(s: eventstore.Snapshot) => {
-        val aggr = atype.newInstance().asInstanceOf[T]
+        val aggr = tmpl
         val mem = s.payload.asInstanceOf[IMemento]
         aggr.loadFromMemento(mem, s.streamId, s.streamRevision)
         aggr
@@ -55,13 +55,15 @@ class EventStoreRepository(val store: eventstore.IStoreEvents, val bus: IEventPu
   }
 
   def getById[T <: AggregateRoot: ClassTag](id: GUID, tmpl: T): T = {
-    val atype = classTag[T].runtimeClass
-    log.debug("getById {}", atype.getName)
+    if (log.isDebugEnabled()) {
+      val atype = classTag[T].runtimeClass
+      log.debug("getById {}", atype.getName)
+    }
     val versionToLoad = Int.MaxValue
     val snapshot = store.advanced.getSnapshot(id, versionToLoad)
     val stream = openStream(id, versionToLoad, snapshot)
 
-    val aggregate: T = getAggregate(atype, snapshot, stream)
+    val aggregate: T = getAggregate(tmpl, snapshot, stream)
 
     val evs = stream.committedEvents.map(ev => {
       val evb = ev.body.asInstanceOf[DomainEvent]
@@ -105,19 +107,17 @@ abstract class AggregateRoot extends Logging {
   def getUncommittedChanges = uncommittedChanges.toIterable
   def getRevision = revision
 
+  def handle: PartialFunction[DomainEvent, Unit]
+
   // aka raiseEvent
   def applyChange(e: DomainEvent, isNew: Boolean = true) = {
-    try {
-      val x = this.getClass().getMethod("handle", e.getClass())
-      x.invoke(this, e)
-    } catch {
-      case e: NoSuchMethodException => log.warn("Aggregate has no handler for {}", e.getClass)
-      case e: Throwable => throw e
+    if (handle.isDefinedAt(e)) {
+      handle(e)
     }
     if (isNew) changes = changes :+ e
   }
 
-  def loadFromHistory(history: Traversable[DomainEvent], newRevision: Int) {
+  private[CQRS] def loadFromHistory(history: Traversable[DomainEvent], newRevision: Int) {
     for (event <- history) {
       applyChange(event, false)
     }
@@ -126,7 +126,7 @@ abstract class AggregateRoot extends Logging {
 
   protected def loadState(state: IMemento) = ???
 
-  def loadFromMemento(state: IMemento, streamId: GUID, streamRevision: Int) = {
+  private[CQRS] def loadFromMemento(state: IMemento, streamId: GUID, streamRevision: Int) = {
     loadState(state)
     changes = Nil
     revision = streamRevision

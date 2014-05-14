@@ -50,6 +50,11 @@ trait IStoreEvents {
     })
     stream.commitChanges(java.util.UUID.randomUUID)
   }
+  
+  def allEventMessages = {
+    val cms = advanced.getFrom(EventDateTime.zero)
+    val evms = cms.flatMap(_.events)
+  }
 
 }
 
@@ -65,6 +70,8 @@ trait ICommitEvents {
 }
 
 case class Snapshot(streamId: Guid, streamRevision: Int, payload: Object)
+
+case class CommitedEvent(event:DomainEvent, streamId: Guid, streamRevision:Int)
 
 case class Commit(streamId: Guid, streamRevision: Int, commitId: Guid, commitSequence: Int, commitStamp: EventDateTime, headers: Map[String, Object], events: List[EventMessage]) {
   // TODO: hashcode/equals issue? StreamId+CommitId only
@@ -83,6 +90,12 @@ case class Commit(streamId: Guid, streamRevision: Int, commitId: Guid, commitSeq
 
     true
   }
+  
+  def getEvents : List[CommitedEvent] = {
+    var revision = streamRevision
+    // FIXME: Ensure we have a unit test to check for off-by-one error
+    events.map( ev => {revision+=1; CommitedEvent(ev.body, streamId, revision)})
+  }
 }
 
 case class StreamHead(streamId: Guid, headRevision: Int, snapshotRevision: Int)
@@ -99,6 +112,7 @@ trait IPersistStreams extends ICommitEvents with IAccessSnapshots {
   def getUndispatchedCommits(): Seq[Commit]
   def markCommitAsDispatched(commit: Commit): Unit
   def purge: Unit
+  def transactionCount : Long
 }
 
 trait IPersistenceFactory {
@@ -121,6 +135,10 @@ object EventDateTime {
   /// </summary>
   def now(): EventDateTime = {
     resolver()
+  }
+  
+  def zero() : EventDateTime = {
+    0
   }
 
 }

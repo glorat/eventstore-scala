@@ -190,6 +190,8 @@ class OptimisticEventStream(val streamId: Guid, persistence: ICommitEvents) exte
   protected def buildCommitAttempt(commitId: Guid): Commit = {
     // FIXME: Seems flaky to rely on clock for sequencing!
     val ts = EventDateTime.now
+    // revisions go up by number of events
+    // commits go up by one
     new Commit(streamId, streamRevision + events.size, commitId, commitSequence + 1, ts, uncommittedHeaders.toMap, events)
   }
   def clearChanges: Unit = {

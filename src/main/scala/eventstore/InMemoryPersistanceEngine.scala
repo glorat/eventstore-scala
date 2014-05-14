@@ -15,6 +15,8 @@ class InMemoryPersistenceEngine extends IPersistStreams with Logging {
   def initialize = {
     log.info("Initialized")
   }
+  
+  def transactionCount = commits.size
 
   def getFrom(streamId: Guid, minRevision: Int, maxRevision: Int) = {
     commits.synchronized {
@@ -24,19 +26,19 @@ class InMemoryPersistenceEngine extends IPersistStreams with Logging {
 
   // TODO: Check - All commits are ordered in time aren't they?
 
-  def getFrom(start: EventDateTime) = {
+  def getFrom(start: EventDateTime) : List[Commit]= {
     commits.dropWhile(s => s.commitStamp < start)
   }
 
-  def getFromTo(start: EventDateTime, end: EventDateTime) = {
+  def getFromTo(start: EventDateTime, end: EventDateTime) : List[Commit] = {
     val froms = getFrom(start)
     froms.takeWhile(c => c.commitStamp <= end)
   }
 
   def commit(attempt: Commit) {
     commits.synchronized {
-      if (commits.contains(attempt))
-        throw new DuplicateCommitException // FIXME: DuplicateCommitException
+      if (commits.contains(attempt)) // Doesn't currently work due to wrong equals impl for this semantic
+        throw new DuplicateCommitException
       if (commits.exists(c => c.streamId == attempt.streamId && c.streamRevision == attempt.streamRevision))
         throw new ConcurrencyException("Concurrent Write")
 
