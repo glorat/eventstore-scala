@@ -27,10 +27,10 @@ class InventoryItem extends AggregateRoot {
     this()
     applyChange(InventoryItemCreated(id_, name_))
   }
-  
-  def handle : PartialFunction[DomainEvent, Unit] = {
-    case e : InventoryItemCreated => handle(e)
-    case e : InventoryItemDeactivated => handle(e)
+
+  def handle: PartialFunction[DomainEvent, Unit] = {
+    case e: InventoryItemCreated => handle(e)
+    case e: InventoryItemDeactivated => handle(e)
   }
 
   def handle(e: InventoryItemCreated) = {
@@ -115,7 +115,7 @@ object ReadModelFacade /* : IReadModelFacade*/ {
     }
 }
 
-object InventoryListView //: Handles<InventoryItemCreated>, Handles<InventoryItemRenamed>, Handles<InventoryItemDeactivated>
+object InventoryListView extends EventStreamReceiver //: Handles<InventoryItemCreated>, Handles<InventoryItemRenamed>, Handles<InventoryItemDeactivated>
 {
   def handle(ce: CommitedEvent): Unit = {
     ce.event match {
@@ -140,6 +140,27 @@ object InventoryListView //: Handles<InventoryItemCreated>, Handles<InventoryIte
     BullShitDatabase.list = BullShitDatabase.list.filter(x => x.id != message.id)
   }
 }
+trait EventStreamReceiver {
+  def handle(ce:CommitedEvent)
+}
+object OnDemandEventBus extends Logging {
+  var time = EventDateTime.zero
+  var registrations : Seq[EventStreamReceiver] = Seq(InventoryItemDetailView,InventoryListView)
+
+  def pollEventStream(s: IPersistStreams): Unit = {
+    val cms = s.getFrom(time)
+    if (cms.size > 0) {
+      val ret = cms.flatMap(_.getEvents).foreach(c => handle(c))
+      time = cms.last.commitStamp
+    }
+  }
+
+  def handle(ce: CommitedEvent): Unit = {
+    // Publish to registrations
+    // These could be done in parallel!
+    registrations.foreach(_.handle(ce))
+  }
+}
 
 object PollingEventBus extends Actor with Logging {
   var time = EventDateTime.zero
@@ -148,25 +169,12 @@ object PollingEventBus extends Actor with Logging {
     case s: IPersistStreams => pollEventStream(s)
     case _ => throw new Exception("Gah")
   }
-
-  def pollEventStream(s: IPersistStreams): Unit = {
-    val cms = s.getFrom(time)
-    if (cms.size > 0) {
-      val ret = cms.flatMap(_.getEvents).foreach(c => handle(c))
-      time = cms.last.commitStamp
-    }
-
-  }
-
-  def handle(ce: CommitedEvent): Unit = {
-    // Publish to registrations
-    InventoryItemDetailView.handle(ce)
-    InventoryListView.handle(ce)
-  }
+  
+  def pollEventStream(s:IPersistStreams) = OnDemandEventBus.pollEventStream(s)
 
 }
 
-object InventoryItemDetailView extends Logging // : Handles<InventoryItemCreated>, Handles<InventoryItemDeactivated>, Handles<InventoryItemRenamed>, Handles<ItemsRemovedFromInventory>, Handles<ItemsCheckedInToInventory>
+object InventoryItemDetailView extends Logging with EventStreamReceiver
 {
 
   def handle(ce: CommitedEvent): Unit = {
@@ -186,8 +194,8 @@ object InventoryItemDetailView extends Logging // : Handles<InventoryItemCreated
   def handle(message: InventoryItemRenamed, version: Int) =
     {
       val d = GetDetailsItem(message.id);
-      d.copy(name = message.newName, version = version)
-      // FIXME: replace in DB
+      val newd = d.copy(name = message.newName, version = version)
+      BullShitDatabase.details = BullShitDatabase.details.updated(message.id, newd)
     }
 
   private def GetDetailsItem(id: Guid): InventoryItemDetailsDto =
@@ -203,7 +211,7 @@ object InventoryItemDetailView extends Logging // : Handles<InventoryItemCreated
     val d = GetDetailsItem(message.id)
     val newd = d.copy(currentCount = d.currentCount - message.count, version = version)
     BullShitDatabase.details = BullShitDatabase.details.updated(message.id, newd)
-    
+
   }
 
   def handle(message: ItemsCheckedInToInventory, version: Int) = {
@@ -219,7 +227,7 @@ object InventoryItemDetailView extends Logging // : Handles<InventoryItemCreated
 }
 
 class InventoryCommandActor(cmds: InventoryCommandHandlers) {
-  def receive :PartialFunction[Command, Unit] = {
+  def receive: PartialFunction[Command, Unit] = {
     case c: CreateInventoryItem => cmds.handle(c)
     case c: DeactivateInventoryItem => cmds.handle(c)
     case c: RemoveItemsFromInventory => cmds.handle(c)
@@ -245,7 +253,7 @@ object Example extends App {
   val cmdActor = new InventoryCommandActor(cmds)
   val viewActor = InventoryItemDetailView
   val bus = system.actorOf(Props(PollingEventBus))
-  
+
   println("Creating item with id " + id)
   cmdActor.receive(CreateInventoryItem(id, "test"))
 
@@ -259,7 +267,7 @@ object Example extends App {
   PollingEventBus.pollEventStream(store.advanced)
 
   println("Current item" + ReadModelFacade.getInventoryItemDetails(id))
-  
+
   // Wait
   val evs = store.advanced.getFrom(0).flatMap(_.events).map(em => em.body.asInstanceOf[DomainEvent])
   evs.foreach(ev => println(ev))
