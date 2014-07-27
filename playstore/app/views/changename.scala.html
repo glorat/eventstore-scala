@@ -1,0 +1,11 @@
+@(form : Form[CQRS.RenameInventoryItem])
+
+@main("Rename item") {
+@helper.form(action = routes.Application.doChangeName) {
+  <input type="hidden" name="id" value="@form.data.get("id")">
+  <input type="hidden" name="version" value="@form.data.get("version")">
+  
+  @helper.inputText(form("name"))
+  <button name="submit">Submit</button>
+}
+}

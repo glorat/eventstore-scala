@@ -1,0 +1,10 @@
+@(detail : CQRS.InventoryItemDetailsDto)
+
+@main("Remove") {
+@helper.form(action = routes.Application.doRemove) {
+  <input type="hidden" name="id" value="@detail.id">
+  <input type="hidden" name="version" value="@detail.version">
+  Number: <input type="number" name="number"><br>
+  <button name="submit">Submit</button>
+}
+}

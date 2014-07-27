@@ -1,0 +1,9 @@
+@(form : Form[CQRS.CreateInventoryItem])
+
+@main("Add new item") {
+
+@helper.form(action = routes.Application.doAdd) {
+  @helper.inputText(form("name"))
+  <button name="submit">Submit</button>
+}
+}

@@ -1,0 +1,15 @@
+@(detail : CQRS.InventoryItemDetailsDto)
+
+@main("Details") {
+<h2>Details:</h2>
+Id: @detail.id<br>
+Name: @detail.name<br>
+Count: @detail.currentCount<br /><br>
+Version @detail.version<br>
+
+
+<a href="@routes.Application.rename(detail.id.toString)">Rename</a><br>
+<a href="@routes.Application.doDeactivate(detail.id.toString, detail.version)">Deactivate</a><br>
+<a href="@routes.Application.checkin(detail.id.toString)">Check in</a><br>
+<a href="@routes.Application.remove(detail.id.toString)">Remove</a><br>
+}

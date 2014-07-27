@@ -1,0 +1,12 @@
+@(items: Seq[CQRS.InventoryItemListDto])
+
+@main("Home Page") {
+<h2>All items</h2>
+<ul>
+	@for(i <- items) {
+	   <a href="@routes.Application.detail(i.id.toString)">@i.name</a><br>
+	}
+</ul>
+<a href="add">Add</a>
+<!-- Your new application is ready. -->
+}

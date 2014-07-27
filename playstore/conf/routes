@@ -1,0 +1,20 @@
+# Routes
+# This file defines all application routes (Higher priority routes first)
+# ~~~~
+
+# Home page
+GET     /                           controllers.Application.index
+GET	    /detail                     controllers.Application.detail(id:String ?="")
+GET	    /checkin                    controllers.Application.checkin(id:String ?="")
+GET     /remove                     controllers.Application.remove(id:String ?= "")
+GET	    /rename                     controllers.Application.rename(id:String ?="")
+GET     /add                        controllers.Application.add
+GET     /changename                 controllers.Application.changename
+POST    /add                        controllers.Application.doAdd
+POST    /changename                 controllers.Application.doChangeName
+POST    /checkin                    controllers.Application.doCheckIn
+POST    /remove                     controllers.Application.doRemove
+GET     /deactivate                 controllers.Application.doDeactivate(id:String?="",version:Int?=0)
+
+# Map static resources from the /public folder to the /assets URL path
+GET     /assets/*file               controllers.Assets.at(path="/public", file)
