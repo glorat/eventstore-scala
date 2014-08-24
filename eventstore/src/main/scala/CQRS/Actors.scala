@@ -60,10 +60,9 @@ object EventBus extends Logging {
   var observers: Seq[EventStreamReceiver] = Seq()
 }
 
-object OnDemandEventBus extends Logging {
+class OnDemandEventBus(var registrations: Seq[EventStreamReceiver]) extends Logging {
   var time = EventDateTime.zero
-  var registrations: Seq[EventStreamReceiver] = Seq(InventoryItemDetailView, InventoryListView)
-
+  
   def pollEventStream(s: IPersistStreams): Unit = {
     val cms = s.getFrom(time + 1) // Need to move it a bit forward to be exclusive!
     if (cms.size > 0) {
@@ -80,7 +79,7 @@ object OnDemandEventBus extends Logging {
   }
 }
 
-class PollingEventBus(s: IPersistStreams) extends Actor with Logging {
+class PollingEventBus(ondemand: OnDemandEventBus ,s: IPersistStreams) extends Actor with Logging {
   var time = EventDateTime.zero
   import scala.concurrent.duration._
 
@@ -96,10 +95,10 @@ class PollingEventBus(s: IPersistStreams) extends Actor with Logging {
     case _ => throw new Exception("Gah")
   }
 
-  def pollEventStream(s: IPersistStreams) = OnDemandEventBus.pollEventStream(s)
+  def pollEventStream(s: IPersistStreams) = ondemand.pollEventStream(s)
 }
 object PollingEventBus {
-  def props(s: IPersistStreams): Props = {
-    Props(new PollingEventBus(s))
+  def props(ondemand:OnDemandEventBus, s: IPersistStreams): Props = {
+    Props(new PollingEventBus(ondemand,s))
   }
 }

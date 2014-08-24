@@ -19,7 +19,7 @@ class TestCQRS extends AssertionsForJUnit {
   val rep = new EventStoreRepository(store)
   val cmds = new InventoryCommandHandlers(rep)
 
-  val bus = OnDemandEventBus
+  val bus = new OnDemandEventBus(Seq(InventoryItemDetailView, InventoryListView))
 
   val sendCommand: Command => Unit = (cmd => { cmds.receive(cmd); bus.pollEventStream(store.advanced) })
 
