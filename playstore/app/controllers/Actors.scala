@@ -29,8 +29,7 @@ class Actors(implicit app: Application) extends Plugin {
 
   val persistence = new InMemoryPersistenceEngine
   //val persistence = new MongoPersistenceEngine(MongoClient("localhost").getDB("test2"), null)
-  //persistence.purge
-
+  
   val store = new OptimisticEventStore(persistence, Seq())
   val rep = new EventStoreRepository(store)
   private val cmds = new InventoryCommandHandlers(rep)
@@ -38,8 +37,10 @@ class Actors(implicit app: Application) extends Plugin {
   // default Actor constructor
   //val cmdActor = new InventoryCommandActor(cmds)
   val viewActor = InventoryItemDetailView
+  val ondemand : CQRS.OnDemandEventBus = new OnDemandEventBus(Seq(InventoryItemDetailView, InventoryListView))
 
-  lazy val bus = Akka.system.actorOf(PollingEventBus.props(persistence), name = "eventbus")
+  
+  lazy val bus = Akka.system.actorOf(PollingEventBus.props(ondemand, persistence), name = "eventbus")
   lazy val cmdActor = Akka.system.actorOf(SyncCommandHandlerActor.props(cmds, bus), name = "commandHandler")
 
   override def onStart() = {
