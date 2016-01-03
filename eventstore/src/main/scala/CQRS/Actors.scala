@@ -30,16 +30,18 @@ object CommandHandlerActor {
 
 }
 
-class SyncCommandHandlerActor(handler: CommandHandler, readside:ActorRef) extends Actor {
+class SyncCommandHandlerActor(handler: CommandHandler, readside:ActorRef) extends Actor with Logging {
   def receive = {
     case c: Command => {
       try {
         handler.receive(c)
-        readside.ask("Ping")(10 seconds) 
-        sender() ! akka.actor.Status.Success
+        readside.ask("Ping")(10 seconds)
+        log.debug("Return success to sender")
+        sender() ! c
       } catch {
         case e: Exception =>
-          sender() ! akka.actor.Status.Failure(e)
+          log.debug("Return failure to sender")
+          sender() ! e
           throw e
       }
     }
