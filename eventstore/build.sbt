@@ -24,26 +24,26 @@ libraryDependencies ++= Seq(
 "com.typesafe.akka" %% "akka-actor" % "2.4.17"
 )
 
-// retrieveManaged := true
+publishMavenStyle := true
 
-pomExtra := {
-  <url>https://github.com/glorat/eventstore-scala</url>
-    <licenses>
-      <license>
-        <name>GNU LESSER GENERAL PUBLIC LICENSE</name>
-        <url>https://www.gnu.org/licenses/lgpl-3.0.txt</url>
-      </license>
-    </licenses>
-    <scm>
-      <connection>scm:git:github.com/glorat/eventstore-scala.git</connection>
-      <developerConnection>scm:git:git@github.com/glorat/eventstore-scala.git</developerConnection>
-      <url>github.com/glorat/eventstore-scala.git</url>
-    </scm>
-    <developers>
-      <developer>
-        <id>glorat</id>
-        <name>Kevin Tam</name>
-        <url>https://github.com/glorat/</url>
-      </developer>
-    </developers>
-}
+pomIncludeRepository := { _ => false }
+
+licenses := Seq("GNU LESSER GENERAL PUBLIC LICENSE" -> url("https://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt"))
+
+homepage := Some(url("https://github.com/glorat/eventstore-scala"))
+
+scmInfo := Some(
+  ScmInfo(
+    url("https://github.com/glorat/eventstore-scala"),
+    "scm:git@github.com:glorat/eventstore-scala.git"
+  )
+)
+
+developers := List(
+  Developer(
+    id    = "glorat",
+    name  = "Kevin Tam",
+    email = "kevin@glorat.net",
+    url   = url("https://github.com/glorat")
+  )
+)
