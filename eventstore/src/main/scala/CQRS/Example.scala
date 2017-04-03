@@ -104,24 +104,24 @@ class InventoryCommandHandlers(repository: IRepository) extends CommandHandler {
 case class InventoryItemListDto(id: GUID, name: String)
 case class InventoryItemDetailsDto(id: GUID, name: String, currentCount: Int, version: Int)
 
-object BullShitDatabase {
+class BullShitDatabase() {
   var details = Map[GUID, InventoryItemDetailsDto]()
   var list = List[InventoryItemListDto]()
 }
 
-object ReadModelFacade /* : IReadModelFacade*/ {
+class ReadModelFacade(db: BullShitDatabase) {
   def getInventoryItems(): List[InventoryItemListDto] =
     {
-      BullShitDatabase.list
+      db.list
     }
 
   def getInventoryItemDetails(id: Guid): Option[InventoryItemDetailsDto] =
     {
-      return BullShitDatabase.details.get(id)
+      return db.details.get(id)
     }
 }
 
-object InventoryListView extends EventStreamReceiver //: Handles<InventoryItemCreated>, Handles<InventoryItemRenamed>, Handles<InventoryItemDeactivated>
+class InventoryListView(db: BullShitDatabase) extends EventStreamReceiver //: Handles<InventoryItemCreated>, Handles<InventoryItemRenamed>, Handles<InventoryItemDeactivated>
 {
   def handle(ce: CommitedEvent): Unit = {
     ce.event match {
@@ -135,18 +135,18 @@ object InventoryListView extends EventStreamReceiver //: Handles<InventoryItemCr
   }
 
   def handle(message: InventoryItemCreated, version: Int) = {
-    BullShitDatabase.list = BullShitDatabase.list.+:(InventoryItemListDto(message.id, message.name))
+    db.list = db.list.+:(InventoryItemListDto(message.id, message.name))
   }
 
   def handle(message: InventoryItemRenamed, version: Int) = {
-    BullShitDatabase.list = BullShitDatabase.list.map { x => if (x.id == message.id) x.copy(name = message.newName) else x }
+    db.list = db.list.map { x => if (x.id == message.id) x.copy(name = message.newName) else x }
   }
 
   def handle(message: InventoryItemDeactivated, version: Int) = {
-    BullShitDatabase.list = BullShitDatabase.list.filter(x => x.id != message.id)
+    db.list = db.list.filter(x => x.id != message.id)
   }
 }
-object InventoryItemDetailView extends Logging with EventStreamReceiver {
+class InventoryItemDetailView(db:BullShitDatabase) extends Logging with EventStreamReceiver {
 
   def handle(ce: CommitedEvent): Unit = {
 
@@ -161,18 +161,18 @@ object InventoryItemDetailView extends Logging with EventStreamReceiver {
   }
 
   def handle(message: InventoryItemCreated, version: Int) = {
-    BullShitDatabase.details = BullShitDatabase.details + (message.id -> InventoryItemDetailsDto(message.id, message.name, 0, version))
+    db.details = db.details + (message.id -> InventoryItemDetailsDto(message.id, message.name, 0, version))
   }
   def handle(message: InventoryItemRenamed, version: Int) =
     {
       val d = GetDetailsItem(message.id);
       val newd = d.copy(name = message.newName, version = version)
-      BullShitDatabase.details = BullShitDatabase.details.updated(message.id, newd)
+      db.details = db.details.updated(message.id, newd)
     }
 
   private def GetDetailsItem(id: Guid): InventoryItemDetailsDto =
     {
-      val d = BullShitDatabase.details.get(id)
+      val d = db.details.get(id)
       if (!d.isDefined) {
         throw new Exception("did not find the original inventory this shouldnt happen");
       }
@@ -182,18 +182,18 @@ object InventoryItemDetailView extends Logging with EventStreamReceiver {
   def handle(message: ItemsRemovedFromInventory, version: Int) = {
     val d = GetDetailsItem(message.id)
     val newd = d.copy(currentCount = d.currentCount - message.count, version = version)
-    BullShitDatabase.details = BullShitDatabase.details.updated(message.id, newd)
+    db.details = db.details.updated(message.id, newd)
 
   }
 
   def handle(message: ItemsCheckedInToInventory, version: Int) = {
     val d = GetDetailsItem(message.id);
     val newd = d.copy(currentCount = d.currentCount + message.count, version = version)
-    BullShitDatabase.details = BullShitDatabase.details.updated(message.id, newd)
+    db.details = db.details.updated(message.id, newd)
 
   }
 
   def handle(message: InventoryItemDeactivated, version: Int) = {
-    BullShitDatabase.details = BullShitDatabase.details - message.id;
+    db.details = db.details - message.id;
   }
 }

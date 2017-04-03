@@ -51,6 +51,7 @@ object Application extends Controller {
     .getOrElse(throw new RuntimeException("MyPlugin not loaded"))
   val bus = svcs.bus
   val cmdActor = svcs.cmdActor
+  val read = svcs.read
   // val cmds = svcs.cmds
 
   // Forms that wrap commands
@@ -78,9 +79,9 @@ object Application extends Controller {
     import play.api.libs.concurrent.Execution.Implicits._
 
     val ret = (bus ? "Startup").map { x =>
-      val items = CQRS.ReadModelFacade.getInventoryItems
+      val items = read.getInventoryItems
       if (items.size == 0) {
-        // Get some stuff in 
+        // Get some stuff in
         val id = java.util.UUID.randomUUID
         val id1 = java.util.UUID.randomUUID
         val id2 = java.util.UUID.randomUUID
@@ -101,8 +102,7 @@ object Application extends Controller {
 
   def index = Action {
     Logger.info("index requested")
-    val x = CQRS.ReadModelFacade
-    val items = x.getInventoryItems
+    val items = read.getInventoryItems
     Ok(views.html.index(items))
   }
 
@@ -113,7 +113,7 @@ object Application extends Controller {
 
   def rename(id: String) = Action {
     val id2 = java.util.UUID.fromString(id)
-    val item = CQRS.ReadModelFacade.getInventoryItemDetails(id2)
+    val item = read.getInventoryItemDetails(id2)
     if (item.isDefined)
       Ok(views.html.changename(item.get))
     else
@@ -122,7 +122,7 @@ object Application extends Controller {
 
   def detail(id: String) = Action {
     val id2 = java.util.UUID.fromString(id)
-    val item = CQRS.ReadModelFacade.getInventoryItemDetails(id2)
+    val item = read.getInventoryItemDetails(id2)
     if (item.isDefined)
       Ok(views.html.details(item.get))
     else
@@ -134,7 +134,7 @@ object Application extends Controller {
     val formcmd = addForm.bindFromRequest.get
     val cmd = formcmd.copy(inventoryItemId = java.util.UUID.randomUUID())
     (cmdActor ? cmd).map(x=>Redirect("/"))
-    
+
   }
 
   //case class CheckInForm(number: Int, version: Int)
@@ -156,7 +156,7 @@ object Application extends Controller {
   }
 
   def checkin(id: String) = Action {
-    val item = ReadModelFacade.getInventoryItemDetails(java.util.UUID.fromString(id))
+    val item = read.getInventoryItemDetails(java.util.UUID.fromString(id))
     if (item.isDefined)
       Ok(views.html.checkin(item.get))
     else
@@ -164,7 +164,7 @@ object Application extends Controller {
   }
 
   def remove(id: String) = Action {
-    val item = ReadModelFacade.getInventoryItemDetails(java.util.UUID.fromString(id))
+    val item = read.getInventoryItemDetails(java.util.UUID.fromString(id))
     if (item.isDefined)
       Ok(views.html.remove(item.get))
     else

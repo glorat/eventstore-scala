@@ -8,25 +8,33 @@ import com.novus.salat.global._
 import org.scalatest.FlatSpec
 
 class TestCQRS extends FlatSpec {
-  val id = java.util.UUID.fromString("9d9814f5-f531-4d80-8722-f61dcc1679b8")
-  val persistence = new InMemoryPersistenceEngine
-  // val persistence = new MongoPersistenceEngine(MongoClient("localhost").getDB("test"), null)
-  // persistence.purge
 
-  val store = new OptimisticEventStore(persistence, Seq())
-  val rep = new EventStoreRepository(store)
-  val cmds = new InventoryCommandHandlers(rep)
+  class MyFixture() {
+    val id : CQRS.GUID = java.util.UUID.fromString("9d9814f5-f531-4d80-8722-f61dcc1679b8")
+    val persistence = new InMemoryPersistenceEngine
+    // val persistence = new MongoPersistenceEngine(MongoClient("localhost").getDB("test"), null)
+    // persistence.purge
 
-  val bus = new OnDemandEventBus(Seq(InventoryItemDetailView, InventoryListView))
+    val store = new OptimisticEventStore(persistence, Seq())
+    val rep = new EventStoreRepository(store)
+    val cmds = new InventoryCommandHandlers(rep)
 
-  val sendCommand: Command => Unit = (cmd => { cmds.receive(cmd); bus.pollEventStream(store.advanced) })
+    val bdb = new BullShitDatabase()
+    val read = new ReadModelFacade(bdb)
+    val bus = new OnDemandEventBus(Seq(new InventoryItemDetailView(bdb), new InventoryListView(bdb)))
 
-  def example : Unit = {
+    val sendCommand: Command => Unit = (cmd => { cmds.receive(cmd); bus.pollEventStream(store.advanced) })
+
+  }
+
+  def example(f : MyFixture) : Unit = {
     import com.novus.salat.global._
 
-    val viewActor = InventoryItemDetailView
+    import f._
+
+
     sendCommand(CreateInventoryItem(id, "test"))
-    val detail = ReadModelFacade.getInventoryItemDetails(id).get
+    val detail = read.getInventoryItemDetails(id).get
     assert(InventoryItemDetailsDto(id, "test", 0, 1) == detail)
     val created = rep.getById(id, new InventoryItem)
     assert(created.getRevision == detail.version)
@@ -34,7 +42,7 @@ class TestCQRS extends FlatSpec {
     sendCommand(CheckInItemsToInventory(id, 10, detail.version))
     sendCommand(CheckInItemsToInventory(id, 20, detail.version + 1))
 
-    val d2 = ReadModelFacade.getInventoryItemDetails(id)
+    val d2 = read.getInventoryItemDetails(id)
     assert(true == d2.isDefined)
     assert(InventoryItemDetailsDto(id, "test", 30, 3) == d2.get)
     // println("Current item" + ReadModelFacade.getInventoryItemDetails(id))
@@ -45,15 +53,16 @@ class TestCQRS extends FlatSpec {
   }
 
   "Inventory example" should "do the obvious" in {
-
+    example(new MyFixture)
   }
 
 
 
-  it should "not allow duplicate or conccurent writes" in {
-    example
+  it should "not allow duplicate or concurrent writes" in {
+    val f = new MyFixture
+    example(f)
     assertThrows[eventstore.ConcurrencyException] {
-      sendCommand(CheckInItemsToInventory(id, 10, 2))
+      f.sendCommand(CheckInItemsToInventory(f.id, 10, 2))
 
     }
 
