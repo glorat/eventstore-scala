@@ -1,17 +1,15 @@
 package eventstore
 
 import org.scalatest.junit.AssertionsForJUnit
-import org.junit.Assert._
-import org.junit.Test
-import org.junit.Before
 import eventstore.persistence.Mongo
 import com.mongodb.casbah.commons.MongoDBObject
 import com.novus.salat.global._
+import org.scalatest.FlatSpec
 
 case class DummyEvent(val foo: String) extends CQRS.DomainEvent
 
-class MongoTest extends AssertionsForJUnit {
-  @Test def mongoCommitRoundtrip = {
+class MongoTest extends FlatSpec {
+  "Mongo commits" should "roundtrip" in {
     val streamId = java.util.UUID.randomUUID()
     val revision = 1
     val newGuid = java.util.UUID.randomUUID()
@@ -23,11 +21,11 @@ class MongoTest extends AssertionsForJUnit {
     val mcs1 = mc.toString
     val commit2 = Mongo().fromMongoCommit(mc)
     // java.lang.AssertionError: expected:
-    // <Commit(123,1,321,1,1367996016868,null,List(EventMessage(Map(),DummyEvent(bar))))> 
+    // <Commit(123,1,321,1,1367996016868,null,List(EventMessage(Map(),DummyEvent(bar))))>
     // but was:
     // <Commit(123,1,321,1,1367996016915,null,List(EventMessage(Map(),DummyEvent(bar))))>
 
-    assertEquals(commit, commit2)
+    assert(commit == commit2)
 
   }
 

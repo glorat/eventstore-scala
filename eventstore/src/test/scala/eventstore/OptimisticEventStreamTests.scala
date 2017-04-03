@@ -1,17 +1,15 @@
 package eventstore
 
+import org.scalatest.FlatSpec
 import org.scalatest.junit.AssertionsForJUnit
-import org.junit.Assert._
-import org.junit.Test
-import org.junit.Before
 
-class when_building_a_stream extends on_the_event_stream with AssertionsForJUnit {
+class when_building_a_stream extends FlatSpec with on_the_event_stream  {
   val MinRevision = 2;
   val MaxRevision = 7;
   val EachCommitHas: Int = 2; // Events
 
-  @Test def hello = {
-    assertTrue(true)
+  "this" should "succeed" in {
+    assert(true == true)
   }
 
   val Committed: IndexedSeq[Commit] =
@@ -52,9 +50,9 @@ object on_the_event_stream {
 */
 }
 
-abstract class on_the_event_stream() {
+trait on_the_event_stream {
   case class DummyEvent() extends CQRS.DomainEvent
-  
+
   protected val DefaultStreamRevision = 1
   protected val DefaultCommitSequence = 1
   val streamId: Guid = java.util.UUID.randomUUID
