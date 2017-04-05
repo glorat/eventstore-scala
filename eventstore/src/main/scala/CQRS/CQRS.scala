@@ -3,6 +3,8 @@ package CQRS
 import scala.reflect.runtime.universe._
 import eventstore.Logging
 import com.novus.salat.annotations.raw.Salat
+
+import scala.concurrent.Future
 import scala.reflect._
 
 trait Message
@@ -11,7 +13,7 @@ trait DomainEvent extends Message /* with Product // But Salat barfs on that */
 trait Command extends Message
 
 trait IEventStore {
-  def saveEvents(aggregateId: GUID, events: Traversable[DomainEvent], expectedVersion: Int)
+  def saveEvents(aggregateId: GUID, events: Traversable[DomainEvent], expectedVersion: Int) : Future[Unit]
   def getEventsForAggregate(aggregateId: GUID): List[DomainEvent]
 }
 trait IEventPublisher
@@ -19,7 +21,7 @@ trait IEventPublisher
 trait CommandHandler {
   // Could have improved modelling here beyond Unit, since Command
   // failures aren't really Exception-al
-  def receive: PartialFunction[Command, Unit]
+  def receive: PartialFunction[Command, Future[Unit]]
 }
 
 abstract class EventStore extends IEventStore {
@@ -82,7 +84,7 @@ class EventStoreRepository(val store: eventstore.IStoreEvents, val bus: IEventPu
 }
 
 trait IRepository {
-  def save(aggregate: AggregateRoot, expectedVersion: Int)
+  def save(aggregate: AggregateRoot, expectedVersion: Int) : Future[Unit]
   def getById[T <: AggregateRoot: ClassTag](id: GUID, tmpl: T): T
 }
 

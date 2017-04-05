@@ -7,6 +7,9 @@ import com.mongodb.casbah.commons.MongoDBObject
 import com.novus.salat.global._
 import org.scalatest.FlatSpec
 
+import scala.concurrent.{Await, ExecutionContext}
+import scala.concurrent.duration.Duration
+
 class TestCQRS extends FlatSpec {
 
   class MyFixture() {
@@ -21,10 +24,14 @@ class TestCQRS extends FlatSpec {
 
     val bdb = new BullShitDatabase()
     val read = new ReadModelFacade(bdb)
+    implicit val ec :ExecutionContext = ExecutionContext.global
     val bus = new OnDemandEventBus(Seq(new InventoryItemDetailView(bdb), new InventoryListView(bdb)))
 
-    val sendCommand: Command => Unit = (cmd => { cmds.receive(cmd); bus.pollEventStream(store.advanced) })
-
+    val sendCommand: Command => Unit = (cmd => {
+      val cmdFuture = cmds.receive(cmd);
+      Await.result(cmdFuture, Duration.Inf)
+      bus.pollEventStream(store.advanced)
+    })
   }
 
   def example(f : MyFixture) : Unit = {

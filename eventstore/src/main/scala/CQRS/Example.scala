@@ -5,6 +5,8 @@ import eventstore.persistence.MongoPersistenceEngine
 import com.mongodb.casbah.Imports._
 import akka.actor._
 
+import scala.concurrent.Future
+
 case class DeactivateInventoryItem(inventoryItemId: GUID, originalVersion: Int) extends Command
 case class CreateInventoryItem(inventoryItemId: GUID, name: String) extends Command
 case class RenameInventoryItem(inventoryItemId: GUID, newName: String, originalVersion: Int) extends Command
@@ -65,7 +67,7 @@ class InventoryItem extends AggregateRoot {
 }
 
 class InventoryCommandHandlers(repository: IRepository) extends CommandHandler {
-  def receive: PartialFunction[Command, Unit] = {
+  def receive: PartialFunction[Command, Future[Unit]] = {
     case c: CreateInventoryItem => handle(c)
     case c: DeactivateInventoryItem => handle(c)
     case c: RemoveItemsFromInventory => handle(c)
@@ -123,7 +125,7 @@ class ReadModelFacade(db: BullShitDatabase) {
 
 class InventoryListView(db: BullShitDatabase) extends EventStreamReceiver //: Handles<InventoryItemCreated>, Handles<InventoryItemRenamed>, Handles<InventoryItemDeactivated>
 {
-  def handle(ce: CommitedEvent): Unit = {
+  def handle(ce: CommitedEvent): Future[Unit] = {
     ce.event match {
       case a: InventoryItemRenamed => handle(a, ce.streamRevision)
       case a: InventoryItemCreated => handle(a, ce.streamRevision)
@@ -132,6 +134,8 @@ class InventoryListView(db: BullShitDatabase) extends EventStreamReceiver //: Ha
       case a: InventoryItemDeactivated => handle(a, ce.streamRevision)
       case _ => ()
     }
+    // We are all synchronous here
+    Future.successful()
   }
 
   def handle(message: InventoryItemCreated, version: Int) = {
@@ -148,7 +152,7 @@ class InventoryListView(db: BullShitDatabase) extends EventStreamReceiver //: Ha
 }
 class InventoryItemDetailView(db:BullShitDatabase) extends Logging with EventStreamReceiver {
 
-  def handle(ce: CommitedEvent): Unit = {
+  def handle(ce: CommitedEvent): Future[Unit] = {
 
     log.info(s"${ce.streamId} , ${ce.streamRevision} handled")
     ce.event match {
@@ -158,6 +162,8 @@ class InventoryItemDetailView(db:BullShitDatabase) extends Logging with EventStr
       case a: ItemsCheckedInToInventory => handle(a, ce.streamRevision)
       case a: InventoryItemDeactivated => handle(a, ce.streamRevision)
     }
+
+    Future.successful()
   }
 
   def handle(message: InventoryItemCreated, version: Int) = {

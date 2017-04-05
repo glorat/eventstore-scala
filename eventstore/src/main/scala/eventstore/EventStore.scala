@@ -3,6 +3,8 @@ package eventstore
 import CQRS.DomainEvent
 import com.novus.salat.annotations.raw.Salat
 
+import scala.concurrent.Future
+
 case class EventMessage(headers: Map[String, Object] = Map(), body: DomainEvent)
 
 trait IEventStream {
@@ -41,16 +43,18 @@ trait IStoreEvents {
   def openStream(snapshot: Snapshot, maxRevision: Int): IEventStream
   def advanced: IPersistStreams
 
-  def saveEvents(streamId: Guid, events: Iterable[DomainEvent], expectedVersion: Int) = {
+  def saveEvents(streamId: Guid, events: Iterable[DomainEvent], expectedVersion: Int) : Future[Unit]= {
     // store.saveEvents(aggregate.id, aggregate.getUncommitedChanges, expectedVersion)
     val stream = openStream(streamId, expectedVersion, expectedVersion)
 
     events.foreach(ev => {
       stream.add(eventstore.EventMessage(body = ev))
     })
+    // TODO: commitChanges should return Future since I/O should be async
     stream.commitChanges(java.util.UUID.randomUUID)
+    Future.successful()
   }
-  
+
   def allEventMessages = {
     val cms = advanced.getFrom(EventDateTime.zero)
     val evms = cms.flatMap(_.events)
@@ -90,7 +94,7 @@ case class Commit(streamId: Guid, streamRevision: Int, commitId: Guid, commitSeq
 
     true
   }
-  
+
   def getEvents : List[CommitedEvent] = {
     // FIXME: Ensure we have a unit test to check for off-by-one error
     // and surely there must be better reasoning for this...
@@ -137,7 +141,7 @@ object EventDateTime {
   def now(): EventDateTime = {
     resolver()
   }
-  
+
   def zero() : EventDateTime = {
     0
   }

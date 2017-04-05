@@ -1,6 +1,7 @@
 package controllers
 
 import akka.actor._
+
 import scala.concurrent.duration._
 import play.api._
 import play.api.libs.concurrent.Akka
@@ -16,6 +17,8 @@ import CQRS._
 import eventstore.InMemoryPersistenceEngine
 import eventstore.persistence.MongoPersistenceEngine
 import com.mongodb.casbah.MongoClient
+
+import scala.concurrent.ExecutionContext
 
 class Actors(implicit app: Application) extends Plugin {
 
@@ -38,7 +41,9 @@ class Actors(implicit app: Application) extends Plugin {
   //val cmdActor = new InventoryCommandActor(cmds)
   val bdb = new BullShitDatabase
   val viewActor = new InventoryItemDetailView(bdb)
-  val ondemand : CQRS.OnDemandEventBus = new OnDemandEventBus(Seq(viewActor, new InventoryListView(bdb)))
+  // TODO: Is this shared with akka?
+  val ec:ExecutionContext = ExecutionContext.global
+  val ondemand : CQRS.OnDemandEventBus = new OnDemandEventBus(Seq(viewActor, new InventoryListView(bdb)), ec)
 
   val read = new ReadModelFacade(bdb)
 

@@ -8,6 +8,8 @@ import eventstore.EventDateTime
 import akka.actor.Props
 import akka.actor.ActorRef
 import akka.pattern.ask
+
+import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.concurrent.duration._
 
 class CommandHandlerActor(handler: CommandHandler) extends Actor {
@@ -54,30 +56,36 @@ object SyncCommandHandlerActor {
 }
 
 trait EventStreamReceiver {
-  var lastEvent = EventDateTime.zero
-  def handle(ce: CommitedEvent)
+  var lastEvent :EventDateTime = EventDateTime.zero
+  def handle(ce: CommitedEvent) : Future[Unit]
 }
 
 object EventBus extends Logging {
   var observers: Seq[EventStreamReceiver] = Seq()
 }
 
-class OnDemandEventBus(var registrations: Seq[EventStreamReceiver]) extends Logging {
+class OnDemandEventBus(var registrations: Seq[EventStreamReceiver])(implicit val ec:ExecutionContext) extends Logging {
   var time = EventDateTime.zero
-  
-  def pollEventStream(s: IPersistStreams): Unit = {
+
+  def pollEventStream(s: IPersistStreams): Future[Unit] = {
     val cms = s.getFrom(time + 1) // Need to move it a bit forward to be exclusive!
+
     if (cms.size > 0) {
-      val ret = cms.flatMap(_.getEvents).foreach(c => handle(c))
+      val ret = cms.flatMap(_.getEvents).map(c => handle(c))
       log.warn("Demand bus acquired {} more events", cms.size)
       time = cms.last.commitStamp
+      Future.sequence(ret).map(x => ())
+    }
+    else {
+      Future.successful()
     }
   }
 
-  def handle(ce: CommitedEvent): Unit = {
+  def handle(ce: CommitedEvent): Future[Unit] = {
     // Publish to registrations
-    // These could be done in parallel!
-    registrations.foreach(_.handle(ce))
+    // These might be done in parallel!
+    val all = registrations.map(_.handle(ce))
+    Future.sequence(all).map(x => ())
   }
 }
 
