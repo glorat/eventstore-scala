@@ -43,7 +43,7 @@ class Actors(implicit app: Application) extends Plugin {
   val viewActor = new InventoryItemDetailView(bdb)
   // TODO: Is this shared with akka?
   val ec:ExecutionContext = ExecutionContext.global
-  val ondemand : CQRS.OnDemandEventBus = new OnDemandEventBus(Seq(viewActor, new InventoryListView(bdb)), ec)
+  val ondemand : CQRS.OnDemandEventBus = new OnDemandEventBus(Seq(viewActor, new InventoryListView(bdb)))(ec)
 
   val read = new ReadModelFacade(bdb)
 
