@@ -10,6 +10,6 @@ object EventstoreBuild extends Build {
   lazy val eventstore = project
 
 //  lazy val playstore = Project(id = "playstore", base = file("playstore")).dependsOn(eventstore)
-  lazy val playstore = project.dependsOn(eventstore).enablePlugins(play.PlayScala)
+  lazy val playstore = project.dependsOn(eventstore % "compile->compile;compile->test").enablePlugins(play.PlayScala)
 
 }

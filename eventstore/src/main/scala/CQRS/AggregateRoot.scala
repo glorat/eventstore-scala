@@ -12,6 +12,7 @@ abstract class AggregateRoot extends Logging {
   private var revision: Int = 0
 
   def id: GUID
+  def getState: Object // Must be an immutable value object
 
   private def uncommittedChanges = changes
 
@@ -28,16 +29,16 @@ abstract class AggregateRoot extends Logging {
     if (isNew) changes = changes :+ e
   }
 
-  private[CQRS] def loadFromHistory(history: Traversable[DomainEvent], newRevision: Int) {
+  /*private[CQRS]*/ def loadFromHistory(history: Traversable[DomainEvent], newRevision: Int) {
     for (event <- history) {
       applyChange(event, false)
     }
     revision = newRevision
   }
 
-  protected def loadState(state: IMemento) = ???
+  protected def loadState(state:Object) : Unit = ???
 
-  private[CQRS] def loadFromMemento(state: IMemento, streamId: GUID, streamRevision: Int) = {
+  /*private[CQRS]*/ def loadFromMemento(state: Object, streamId: GUID, streamRevision: Int) = {
     loadState(state)
     changes = Nil
     revision = streamRevision

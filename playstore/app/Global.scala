@@ -1,12 +1,16 @@
+import CQRS._
+import cakesolutions.kafka.testkit.KafkaServer
+import eventstore.{KafkaEventDispatcher, KafkaEventStore}
 import play.api._
-import scala.concurrent.Await
+
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration._
 
 object Global extends GlobalSettings {
 
+
+
   override def onStart(app: Application) {
-    val initFuture = controllers.Application.init
-    Await.ready(initFuture, 5 seconds)
     Logger.info("Global application has started")
   }
 

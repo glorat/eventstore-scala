@@ -1,9 +1,6 @@
 package CQRS
 
 import eventstore._
-import eventstore.persistence.MongoPersistenceEngine
-import com.mongodb.casbah.Imports._
-import akka.actor._
 
 import scala.concurrent.Future
 
@@ -21,9 +18,28 @@ case class ItemsRemovedFromInventory(id: GUID, count: Int) extends DomainEvent
 
 case class InventoryItemState(id: GUID, activated: Boolean)
 
+object InventoryItem {
+  /**
+    * Maps initial DomainEvent to a template initial state of the AR
+    */
+  val registry : (DomainEvent => AggregateRoot) = {
+    (e:DomainEvent) => {
+      e match {
+        case _:InventoryItemCreated => new InventoryItem()
+        case _ => throw new IllegalArgumentException(s"${e.getClass.getName} is not a valid initial event")
+      }
+    }
+  }
+}
+
 class InventoryItem extends AggregateRoot {
-  var activated: Boolean = false
-  var id: GUID = java.util.UUID.randomUUID()
+  protected var state = InventoryItemState(id = java.util.UUID.randomUUID(), activated = false)
+  def getState : InventoryItemState = state
+  override protected def loadState(saved:Object) : Unit = {
+    state = saved.asInstanceOf[InventoryItemState]
+  }
+
+  def id = state.id
 
   def this(id_ : GUID, name_ : String) = {
     this()
@@ -36,12 +52,11 @@ class InventoryItem extends AggregateRoot {
   }
 
   def handle(e: InventoryItemCreated) = {
-    id = e.id
-    activated = true
+    state = state.copy(id = e.id, activated = true)
   }
 
   def handle(e: InventoryItemDeactivated) = {
-    activated = false
+    state = state.copy(activated = false)
   }
 
   def changeName(newName: String) = {
@@ -60,7 +75,7 @@ class InventoryItem extends AggregateRoot {
   }
 
   def deactivate() {
-    if (!activated) throw new Exception("already deactivated");
+    if (!state.activated) throw new Exception("already deactivated");
     applyChange(InventoryItemDeactivated(id));
   }
 
@@ -77,7 +92,7 @@ class InventoryCommandHandlers(repository: IRepository) extends CommandHandler {
 
   def handle(c: CreateInventoryItem) = {
     val item = new InventoryItem(c.inventoryItemId, c.name)
-    repository.save(item, -1)
+    repository.save(item, 0)
   }
 
   def handle(c: DeactivateInventoryItem) = {
@@ -109,6 +124,7 @@ case class InventoryItemDetailsDto(id: GUID, name: String, currentCount: Int, ve
 class BullShitDatabase() {
   var details = Map[GUID, InventoryItemDetailsDto]()
   var list = List[InventoryItemListDto]()
+
 }
 
 class ReadModelFacade(db: BullShitDatabase) {
@@ -121,6 +137,11 @@ class ReadModelFacade(db: BullShitDatabase) {
     {
       return db.details.get(id)
     }
+
+
+  val streamToVersion : GUID=>Int = (id => {
+    db.details.get(id).map(x => x.version).getOrElse(0)
+  })
 }
 
 class InventoryListView(db: BullShitDatabase) extends EventStreamReceiver //: Handles<InventoryItemCreated>, Handles<InventoryItemRenamed>, Handles<InventoryItemDeactivated>

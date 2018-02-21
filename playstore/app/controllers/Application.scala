@@ -1,22 +1,14 @@
 package controllers
 
-import play.api._
-import play.api.mvc._
-import play.api.data._
-import play.api.data.Forms._
 import CQRS._
-import eventstore._
-import play.api.data.validation.Constraint
+import play.api._
+import play.api.data.Forms._
+import play.api.data._
 import play.api.data.format.Formatter
-import play.api.libs.concurrent.Akka
-import play.api.Play
-import play.api.Play.current
-import akka.actor.ActorRef
-import akka.pattern.ask
+import play.api.mvc._
+
 import scala.concurrent.duration._
-import akka.actor.Status._
-import scala.concurrent.Await
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 object CustomMappings {
 
@@ -47,12 +39,10 @@ object Application extends Controller {
   // TODO: But make this all async!
   implicit val actorTimeout: akka.util.Timeout = 1 second
 
-  val svcs = Play.application.plugin[Actors]
-    .getOrElse(throw new RuntimeException("MyPlugin not loaded"))
-  val bus = svcs.bus
-  val cmdActor = svcs.cmdActor
+  implicit val ec:ExecutionContext = play.api.libs.concurrent.Execution.Implicits.defaultContext
+
+  val svcs = Environment
   val read = svcs.read
-  // val cmds = svcs.cmds
 
   // Forms that wrap commands
   val addForm: Form[CreateInventoryItem] = Form(
@@ -76,9 +66,8 @@ object Application extends Controller {
   }
 
   def init: Future[Any] = {
-    import play.api.libs.concurrent.Execution.Implicits._
 
-    val ret = (bus ? "Startup").map { x =>
+    val ret:Future[Unit] = {
       val items = read.getInventoryItems
       if (items.size == 0) {
         // Get some stuff in
@@ -86,14 +75,15 @@ object Application extends Controller {
         val id1 = java.util.UUID.randomUUID
         val id2 = java.util.UUID.randomUUID
 
+
         for {
-          a <- cmdActor ? (CreateInventoryItem(id1, "Hello"))
-          b <- cmdActor ? (CreateInventoryItem(id2, "World"))
-          c <- cmdActor ? (CheckInItemsToInventory(id1, 10, 1))
+          a <- svcs.cmds.receive (CreateInventoryItem(id1, "Hello"))
+          b <- svcs.cmds.receive (CreateInventoryItem(id2, "World"))
+          c <- svcs.cmds.receive (CheckInItemsToInventory(id1, 10, 1))
         } yield c
 
       } else {
-        Future { Nil }
+        Future.successful(Nil)
       }
     }
     ret.onComplete(_ => Logger.info("Application init completed"))
@@ -130,18 +120,14 @@ object Application extends Controller {
   }
 
   def doAdd() = Action.async { implicit request =>
-    import play.api.libs.concurrent.Execution.Implicits._
     val formcmd = addForm.bindFromRequest.get
     val cmd = formcmd.copy(inventoryItemId = java.util.UUID.randomUUID())
-    (cmdActor ? cmd).map(x=>Redirect("/"))
+    svcs.cmds.receive(cmd).map(x=>Redirect("/"))
 
   }
 
   //case class CheckInForm(number: Int, version: Int)
   def doCheckIn() = Action.async { implicit request =>
-    // import context._
-    import play.api.libs.concurrent.Execution.Implicits._
-
     userForm.bindFromRequest.fold(
       formWithErrors => {
         val errs = formWithErrors.errors
@@ -149,7 +135,7 @@ object Application extends Controller {
         scala.concurrent.Future(Redirect("/"))
       },
       formcmd => {
-        val ret = (cmdActor ? formcmd)
+        val ret = svcs.cmds.receive(formcmd)
         ret.map(x => Redirect("/"))
       })
 
@@ -172,14 +158,11 @@ object Application extends Controller {
   }
 
   def doDeactivate(id: String, version: Int) = Action.async {
-    import play.api.libs.concurrent.Execution.Implicits._
     val cmd = DeactivateInventoryItem(java.util.UUID.fromString(id), version)
-    (cmdActor ? cmd).map(_ => Redirect("/"))
+    svcs.cmds.receive(cmd).map(_ => Redirect("/"))
   }
 
   def doRemove() = Action.async { implicit request =>
-    // import context._
-    import play.api.libs.concurrent.Execution.Implicits._
 
     removeForm.bindFromRequest.fold(
       formWithErrors => {
@@ -188,15 +171,12 @@ object Application extends Controller {
         scala.concurrent.Future(Redirect("/"))
       },
       formcmd => {
-        val ret = (cmdActor ? formcmd)
+        val ret = svcs.cmds.receive(formcmd)
         ret.map(x => Redirect("/"))
       })
 
   }
   def doChangeName() = Action.async { implicit request =>
-    // import context._
-    import play.api.libs.concurrent.Execution.Implicits._
-
     renameForm.bindFromRequest.fold(
       formWithErrors => {
         val errs = formWithErrors.errors
@@ -204,16 +184,10 @@ object Application extends Controller {
         scala.concurrent.Future(Redirect("/"))
       },
       formcmd => {
-        val ret = (cmdActor ? formcmd)
+        val ret = svcs.cmds.receive(formcmd)
         ret.map(x => Redirect("/"))
       })
 
   }
 
-  /*
-   * POST    /add                        controllers.Application.doAdd
-POST    /changename                 controllers.Application.doAdd
-POST    /checkin                    controllers.Application.doCheckIn
-POST    /remove                     controllers.Application.doRemove
-   */
 }
